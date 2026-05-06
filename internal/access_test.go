@@ -7,6 +7,7 @@ package internal
 import (
 	"os/user"
 	"strconv"
+	"syscall"
 	"testing"
 )
 
@@ -55,17 +56,26 @@ func TestHasAccess(t *testing.T) {
 	_ = notMyGid
 	cases := []testcase{
 		{myUid, myGid, myUid, myGid, 0100, 01, true},
+		{myUid, myGid, myUid, myGid, 0400, 06, false},
+		{myUid, myGid, myUid, myGid, 0004, 04, false},
 		{myUid, myGid, myUid + 1, notMyGid, 0001, 0001, true},
 		{myUid, myGid, myUid + 1, notMyGid, 0000, 0001, false},
 		{myUid, myGid, myUid + 1, notMyGid, 0007, 0000, true},
 		{myUid, myGid, myUid + 1, notMyGid, 0020, 002, false},
+		{myUid, myGid, myUid + 1, myGid, 0002, 002, false},
+		{myUid, myGid, myUid + 1, notMyGid, 0004, 006, false},
 		{myUid, myGid, myUid, myGid, 0000, 01, false},
 		{myUid, myGid, myUid, myGid, 0200, 01, false},
+		{0, myGid, myUid + 1, notMyGid, 0000, 01, false},
+		{0, myGid, myUid + 1, notMyGid, 0000, 06, true},
+		{0, myGid, myUid + 1, notMyGid, 0001, 01, true},
 		{0, myGid, myUid + 1, notMyGid, 0700, 01, true},
+		{0, myGid, myUid + 1, notMyGid, syscall.S_IFDIR | 0000, 01, true},
 	}
 
 	if myOtherGid != 0 {
 		cases = append(cases, testcase{myUid, myGid, myUid + 1, myOtherGid, 0020, 002, true})
+		cases = append(cases, testcase{myUid, myGid, myUid + 1, myOtherGid, 0002, 002, false})
 	}
 	for i, tc := range cases {
 		got := HasAccess(tc.uid, tc.gid, tc.fuid, tc.fgid, tc.perm, tc.mask)
